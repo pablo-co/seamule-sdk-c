@@ -13,7 +13,7 @@
 #include "seamule-sdk.h"
 
 json_t *request_jobs(struct seamule_t *seamule) {
-    char *url = get_base_url(seamule, SEAMULE_API_JOBS);
+    char *url = get_base_url(seamule, SEAMULE_API_JOBS, SEMAULE_API_FORMAT);
     struct response_t *response;
 
     json_t *root;
@@ -21,7 +21,7 @@ json_t *request_jobs(struct seamule_t *seamule) {
 
     response = get(url);
     if (!response) {
-        return NULL;
+        goto error;
     }
 
     switch (response->code) {
@@ -29,29 +29,40 @@ json_t *request_jobs(struct seamule_t *seamule) {
             break;
         default:
             fprintf(stderr, "The server responded with a %d. \"%s\":\n", response->code, url);
-            return NULL;
+            goto error;
     }
 
     if (!response->data) {
         fprintf(stderr, "The server didn't send any data %d. \"%s\":\n", response->code, url);
-        return NULL;
+        goto error;
     }
 
     root = json_loads(response->data, 0, &error);
-    free(response->data);
+    response_close(response);
+    free(url);
 
     return root;
+
+    error:
+    response_close(response);
+    free(url);
+    return NULL;
 }
 
 
 json_t *create_job(struct seamule_t *seamule) {
-    char *url = get_base_url(seamule, SEAMULE_API_JOBS);
+    char *url = get_base_url(seamule, SEAMULE_API_JOBS, SEMAULE_API_FORMAT);
     struct response_t *response;
 
     json_t *root;
     json_error_t error;
 
-    response = post(url, NULL);
+    json_t *worker = json_object();
+    response = post(url, worker);
+    if (!response) {
+        goto error;
+    }
+
     switch (response->code) {
         case 422:
             fprintf(stderr, "The are no jobs for processing from \"%s\":\n", url);
@@ -63,24 +74,34 @@ json_t *create_job(struct seamule_t *seamule) {
     }
 
     if (!response->data) {
-        return NULL;
+        goto error;
     }
 
     root = json_loads(response->data, 0, &error);
-    free(response->data);
+    response_close(response);
+    free(url);
 
     return root;
+
+    error:
+    response_close(response);
+    free(url);
+    return NULL;
 }
 
-json_t *send_result(struct seamule_t *seamule, char* id, json_t *result) {
-    char *url = get_base_url(seamule, SEAMULE_API_JOB);
-    join_url(url, id);
+json_t *send_result(struct seamule_t *seamule, char *id, json_t *result) {
+    char *job_url = join_url(id, SEAMULE_API_JOB, SEMAULE_API_FORMAT);
+    char *url = get_base_url(seamule, SEAMULE_API_JOBS, job_url);
     struct response_t *response;
 
     json_t *root;
     json_error_t error;
 
-    response = post(url, NULL);
+    response = patch(url, result);
+    if (!response) {
+        goto error;
+    }
+
     switch (response->code) {
         case 422:
             fprintf(stderr, "The are no jobs for processing from \"%s\":\n", url);
@@ -90,30 +111,34 @@ json_t *send_result(struct seamule_t *seamule, char* id, json_t *result) {
         default:
             break;
     }
-    printf("%s\n", response->data);
-    if (!response->data) {
-        return NULL;
-    }
 
     root = json_loads(response->data, 0, &error);
-    free(response->data);
+    response_close(response);
+    free(url);
 
     return root;
+
+    error:
+    response_close(response);
+    free(url);
+    return NULL;
 }
 
-char *join_url(char *url, char *path) {
+char *join_url(char *url, char *path, char *extension) {
     size_t url_size = strlen(url);
-    size_t jobs_size = strlen(path);
-    char *url_with_path = (char *) malloc(url_size + jobs_size + 1);
+    size_t path_size = strlen(path);
+    size_t extension_size = strlen(extension);
+    size_t total_size = url_size + path_size + extension_size + 1;
+    char *url_with_path = (char *) malloc(total_size);
 
-    snprintf(url_with_path, url_size + jobs_size + 1, path, url);
+    snprintf(url_with_path, total_size, path, url, extension);
 
     return url_with_path;
 }
 
-char *get_base_url(struct seamule_t *seamule, char *path) {
+char *get_base_url(struct seamule_t *seamule, char *path, char *extension) {
     char *url = build_url(seamule->protocol, seamule->domain, seamule->path);
-    return join_url(url, path);
+    return join_url(url, path, extension);
 }
 
 char *build_url(const char *protocol, const char *domain, const char *path) {

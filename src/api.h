@@ -18,8 +18,9 @@
 
 #define SEAMULE_API_PATH "/"
 
-#define SEAMULE_API_JOBS "%sjobs.json"
-#define SEAMULE_API_JOB "%sjobs/%s.json"
+#define SEAMULE_API_JOBS "%sjobs%s"
+#define SEAMULE_API_JOB "/%s%s"
+#define SEMAULE_API_FORMAT ".json"
 
 json_t *request_jobs(struct seamule_t * seamule);
 
@@ -27,9 +28,9 @@ json_t *create_job(struct seamule_t * seamule);
 
 json_t *send_result(struct seamule_t *seamule, char* id, json_t *result);
 
-char *join_url(char *url, char *path);
+char *join_url(char *url, char *path, char *extension);
 
-char *get_base_url(struct seamule_t *seamule, char *path);
+char *get_base_url(struct seamule_t *seamule, char *path, char *extension);
 
 char *build_url(const char *protocol, const char *domain, const char *path);
 

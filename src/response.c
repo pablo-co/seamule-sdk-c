@@ -13,6 +13,8 @@ int response_init(struct response_t *response, int buffer_size) {
 }
 
 void response_close(struct response_t *response) {
-    free(response->data);
-    free(response);
+    if (response != NULL) {
+        free(response->data);
+        free(response);
+    }
 }

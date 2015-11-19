@@ -137,7 +137,7 @@ int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule
     json_t *result = process(payload);
 
     if (result) {
-        send_result(seamule, result, json_string_value(id));
+        send_result(seamule, json_string_value(id), result);
     }
 
     json_decref(jobs);

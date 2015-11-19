@@ -28,6 +28,16 @@ size_t write_response(void *ptr, size_t size, size_t nmemb, void *stream) {
     return size * nmemb;
 }
 
+size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream) {
+    struct write_result_t *result = (struct write_result_t *) stream;
+
+    memcpy(result->data + result->pos, ptr, size * nmemb);
+    result->pos += size * nmemb;
+
+    return size * nmemb;
+}
+
+
 struct response_t *get(const char *url) {
     CURL *curl = NULL;
     CURLcode status;
@@ -159,6 +169,10 @@ struct response_t *patch(const char *url, json_t *json) {
     struct response_t *response = (struct response_t *) malloc(sizeof(struct response_t));
     response_init(response, SEAMULE_NETWORK_BUFFER_SIZE);
 
+    struct write_result_t data;
+    data.data = json_dumps(json, 0);
+    data.pos = 0;
+
     curl_global_init(CURL_GLOBAL_ALL);
     curl = curl_easy_init();
     if (!curl) {
@@ -178,10 +192,15 @@ struct response_t *patch(const char *url, json_t *json) {
 
     /* SeaMule API requires a User-Agent header with a value of SeaMule-Worker*/
     headers = curl_slist_append(headers, "User-Agent: SeaMule-Worker");
+    headers = curl_slist_append(headers, "User-Agent: SeaMule-Worker");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json);
+
+    curl_easy_setopt(curl, CURLOPT_READFUNCTION, write_data);
+
+    curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &write_result);
