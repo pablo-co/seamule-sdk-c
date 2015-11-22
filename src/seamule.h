@@ -8,6 +8,9 @@
 #ifndef SEAMULE_SDK_C_SEAMULE_H
 #define SEAMULE_SDK_C_SEAMULE_H
 
+
+#include <jansson.h>
+
 #define INIT(name, type, number) SEAMULEOPT_##name = type + number
 
 #define SEAMULE_OPTTYPE_LONG 0
@@ -16,6 +19,7 @@
 #define SEAMULE_SDK_MAJOR_VERSION  0
 #define SEAMULE_SDK_MINOR_VERSION  0
 #define SEAMULE_SDK_MICRO_VERSION  1
+
 
 typedef enum {
     /* The protocol that will be used for requests */
@@ -42,13 +46,23 @@ typedef enum {
 
 struct seamule_t {
     char *protocol;
+    int protocol_alloc;
+
     char *domain;
+    int domain_alloc;
+
     char *path;
-    char *buffer_size;
+    int path_alloc;
+
+    long buffer_size;
 };
 
 typedef struct seamule_t SEAMULE;
 
 typedef json_t *(seamule_process)(const json_t *);
+
+void init_seamule(struct seamule_t *seamule);
+
+void close_seamule(struct seamule_t *seamule);
 
 #endif //SEAMULE_SDK_C_SEAMULE_H

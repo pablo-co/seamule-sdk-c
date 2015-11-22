@@ -79,12 +79,14 @@ json_t *create_job(struct seamule_t *seamule) {
 
     root = json_loads(response->data, 0, &error);
     response_close(response);
+    json_decref(worker);
     free(url);
 
     return root;
 
     error:
     response_close(response);
+    json_decref(worker);
     free(url);
     return NULL;
 }
@@ -138,7 +140,11 @@ char *join_url(char *url, char *path, char *extension) {
 
 char *get_base_url(struct seamule_t *seamule, char *path, char *extension) {
     char *url = build_url(seamule->protocol, seamule->domain, seamule->path);
-    return join_url(url, path, extension);
+    char *url_with_path = join_url(url, path, extension);
+
+    free(url);
+
+    return url_with_path;
 }
 
 char *build_url(const char *protocol, const char *domain, const char *path) {

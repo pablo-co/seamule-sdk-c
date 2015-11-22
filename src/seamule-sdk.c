@@ -23,7 +23,7 @@ struct seamule_t *seamule_easy_init() {
 }
 
 SEAMULE_CODE seamule_easy_cleanup(struct seamule_t *seamule) {
-    free(seamule);
+    close_seamule(seamule);
     return SEAMULE_OK;
 }
 
@@ -38,14 +38,11 @@ SEAMULE_CODE seamule_open(struct seamule_t **seamule) {
         return SEAMULE_OUT_OF_MEMORY;
     }
 
-    data->protocol = (char *) malloc(strlen(SEAMULE_API_PROTOCOL) * sizeof(char));
-    strcpy(data->protocol, SEAMULE_API_PROTOCOL);
+    init_seamule(data);
 
-    data->domain = (char *) malloc(strlen(SEAMULE_API_DOMAIN) * sizeof(char));
-    strcpy(data->domain, SEAMULE_API_DOMAIN);
-
-    data->path = (char *) malloc(strlen(SEAMULE_API_PATH) * sizeof(char));
-    strcpy(data->path, SEAMULE_API_PATH);
+    seamule_easy_setopt(data, SEAMULEOPT_PROTOCOL, SEAMULE_API_PROTOCOL);
+    seamule_easy_setopt(data, SEAMULEOPT_DOMAIN, SEAMULE_API_DOMAIN);
+    seamule_easy_setopt(data, SEAMULEOPT_PATH, SEAMULE_API_PATH);
 
     *seamule = data;
 
@@ -73,38 +70,53 @@ SEAMULE_CODE seamule_setopt(struct seamule_t *data, SEAMULE_OPTION option, va_li
 
     switch (option) {
         case SEAMULEOPT_PROTOCOL:
-            free(data->protocol);
+            if (data->protocol_alloc) {
+                free(data->protocol);
+                data->protocol = NULL;
+            }
+            data->protocol_alloc = 1;
             result = set_str_opt(&data->protocol, va_arg(param, char *));
             break;
         case SEAMULEOPT_DOMAIN:
-            free(data->domain);
+            if (data->domain_alloc) {
+                free(data->domain);
+                data->domain = NULL;
+            }
+            data->domain_alloc = 1;
             result = set_str_opt(&data->domain, va_arg(param, char *));
             break;
         case SEAMULEOPT_PATH:
-            free(data->path);
+            if (data->path_alloc) {
+                free(data->path);
+                data->path = NULL;
+            }
+            data->path_alloc = 1;
             result = set_str_opt(&data->path, va_arg(param, char *));
             break;
         case SEAMULEOPT_BUFFER_SIZE:
             data->buffer_size = va_arg(param, long);
             break;
     }
+
     return result;
 }
 
 int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule_process *process) {
-    json_t *jobs, *first_job, *payload, *id;
+    json_t *jobs = NULL;
+    json_t *first_job = NULL;
+    json_t *payload = NULL;
+    json_t *id = NULL;
     json_error_t error;
 
     jobs = request_jobs(seamule);
     if (!jobs) {
         fprintf(stderr, "error: on line %d: %s\n", error.line, error.text);
-        return 1;
+        goto error;
     }
 
     if (!json_is_array(jobs)) {
         fprintf(stderr, "error: root is not an array\n");
-        json_decref(jobs);
-        return 1;
+        goto error;
     }
 
     if (json_array_size(jobs) == 0) {
@@ -115,21 +127,18 @@ int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule
 
     if (!first_job) {
         fprintf(stderr, "error: root is empty\n");
-        json_decref(jobs);
-        return 1;
+        goto error;
     }
 
     if (!json_is_object(first_job)) {
         fprintf(stderr, "error: job %d is not an object\n", 1);
-        json_decref(first_job);
-        return 1;
+        goto error;
     }
 
     id = json_object_get(first_job, "id");
     if (!json_is_string(id)) {
         fprintf(stderr, "error: job id is not a string\n");
-        json_decref(id);
-        return 1;
+        goto error;
     }
 
     payload = json_object_get(first_job, "payload");
@@ -138,18 +147,27 @@ int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule
 
     if (result) {
         send_result(seamule, json_string_value(id), result);
+        json_decref(result);
     }
 
+    json_decref(id);
     json_decref(jobs);
     json_decref(first_job);
     json_decref(payload);
+
+    return 0;
+
+    error:
+    if (id)
+        json_decref(id);
+    if (jobs)
+        json_decref(jobs);
+    if (first_job)
+        json_decref(first_job);
+    return 1;
 }
 
 SEAMULE_CODE set_str_opt(char **char_pointer, char *string) {
-    if (*char_pointer == NULL) {
-        free(*char_pointer);
-    }
-
     if (string) {
         string = strdup(string);
         if (!string) {
@@ -157,6 +175,5 @@ SEAMULE_CODE set_str_opt(char **char_pointer, char *string) {
         }
         *char_pointer = string;
     }
-
     return SEAMULE_OK;
 }
