@@ -106,6 +106,7 @@ int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule
     json_t *first_job = NULL;
     json_t *payload = NULL;
     json_t *id = NULL;
+    json_t *result = NULL;
     json_error_t error;
 
     jobs = request_jobs(seamule);
@@ -143,7 +144,7 @@ int seamule_easy_main(struct seamule_t *seamule, int argc, char *argv[], seamule
 
     payload = json_object_get(first_job, "payload");
 
-    json_t *result = process(payload);
+    result = process(payload);
 
     if (result) {
         send_result(seamule, json_string_value(id), result);
